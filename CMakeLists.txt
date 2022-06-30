@@ -1,0 +1,1 @@
+add_executable(code Tomasolu/main.cpp)
