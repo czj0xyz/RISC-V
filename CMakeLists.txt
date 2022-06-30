@@ -1,1 +1,1 @@
-add_executable(code Tomasolu/main.cpp)
+add_executable(code Tomasulo/main.cpp)
