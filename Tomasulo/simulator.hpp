@@ -4,7 +4,7 @@
 using namespace std;
 
 void Init(){
-    pc=0;
+    pc_fetch=0;
     auto get_num=[](const char &c){return isdigit(c)?c-'0':c-'A'+10;};
     static char S[105];
     int st=0;
@@ -42,10 +42,13 @@ int is_to_RS,is_to_RS_value;
 bool com_to_RS_fl=0;
 int com_to_RS;
 
+bool is_fl=0;
+
 void Reset(){
     RS_out.reset(),RS_in.reset();
     LSB_out.reset(),LSB_in.reset();
     ROB_out.reset(),ROB_in.reset();
+    inst_out.reset(),inst_in.reset();
     ins_RS_fl=ins_ROB_fl=ins_LSB_fl=0;
     for(int i=0;i<reg_size;i++)
         RegStat_in[i].Busy=RegStat_out[i].Busy=0;
@@ -55,7 +58,7 @@ void Reset(){
     memory_store=0;
     ROB_pop_fl=0;
 
-    com_to_RS_fl=is_to_RS_fl=0;
+    com_to_RS_fl=is_to_RS_fl=is_fl=0;
 }
 
 void update(){
@@ -74,6 +77,7 @@ void update(){
     update_LSB_fl_in=update_LSB_fl_out;
     update_LSB_in=update_LSB_out;
     result_LSB_in=result_LSB_out;
+    inst_in=inst_out;
 }
 
 void run_rob(){
@@ -86,7 +90,7 @@ void run_rob(){
         int h=RS_in[calc_RS_in].Dest;
         if(ROB_in[h].Type==4){
             ROB_out[h].Value=RS_in[calc_RS_in].imm;
-            ROB_out[h].Dest=result_RS;
+            ROB_out[h].Dest|=result_RS<<1;
         }else ROB_out[h].Value=result_RS;
         ROB_out[h].Ready=1;
     }
@@ -250,9 +254,31 @@ void run_slbuffer(){
     }
 }
 
-Command inst;
-void run_get_inst(){
-    inst=get_command(mem.Ask(pc,4),pc);
+void run_inst_fetch_queue(){
+    if(!inst_in.full()){
+        Command inst=get_command(mem.Ask(pc_fetch,4),pc_fetch);
+        if(inst.Type==4){//branch
+            if(cnt.Ask(pc_fetch)){
+                pc_fetch+=inst.imm;
+                inst.flag=1;
+            }else {
+                pc_fetch+=4;
+                inst.flag=0;
+            }
+        }else if(inst.Type==5){
+
+            if(ask(inst.opcode,0,6)==0b1101111){//jal
+                int last=pc_fetch;
+                pc_fetch=inst.imm;
+                inst.imm=last+4 ;
+                
+            }else pc_fetch+=4;
+
+        }else pc_fetch+=4;
+        inst_out.push( inst );
+    }
+
+    if(is_fl)inst_out.pop();   
 }
 
 void run_ex(){
@@ -271,10 +297,12 @@ int commit_opcode;
 //0:rs1+rs2 1:rs1+imm 2:load 3:store 4:branch+rs1+rs2 5:branch+rd
 void run_issue(){
 
-    ins_RS_fl=ins_ROB_fl=ins_LSB_fl=is_to_RS_fl=0;
+    ins_RS_fl=ins_ROB_fl=ins_LSB_fl=is_to_RS_fl=is_fl=0;
     if(LSB_in.full()||RS_in.full()||ROB_in.full()){
         return;
     }
+    Command inst=inst_in.front();
+    is_fl=1;
 
     ins.Dest=ROB_in.tail;
     ins.opcode=inst.opcode;
@@ -282,13 +310,12 @@ void run_issue(){
     ins.imm=inst.imm;
     ins.Qj=ins.Qk=0;
 
-    ins_ROB.pc=pc;
+    ins_ROB.pc=inst.pc;
     ins_ROB.Ready=0;
     ins_ROB.opcode=inst.opcode;
     ins_ROB.Dest=inst.rd;
     ins_ROB.Type=inst.Type;
     ins_ROB_fl=1;
-    pc+=4;
     
     if(inst.rs1!=-1){//rs1
         
@@ -336,6 +363,7 @@ void run_issue(){
     }
 
     if(inst.Type==4){//branch+rs1+rs2
+        ins_ROB.Dest=inst.flag;
         ins_RS_fl=1;
     }
 
@@ -349,6 +377,7 @@ void run_issue(){
     }
 }
 
+int CNT=0;
 
 void run_commit(){
     ROB_pop_fl=memory_store=commit_opcode=com_to_RS_fl=0;
@@ -361,21 +390,31 @@ void run_commit(){
         else if(now.Type==2)reg_out[now.Dest]=now.Value;//load
         else if(now.Type==3)memory_store=1,Store=now;//store
         else {//branch
-            if(now.Type==4&&now.Dest){
-                pc=now.pc+now.Value;
-                Reset();
-                flag=1;
+            if(now.Type==4){
+                if(now.Dest&2)cnt.add(now.pc);
+                else cnt.del(now.pc);
+                if(now.Dest==1||now.Dest==2){
+                    if(now.Dest==2)pc_fetch=now.pc+now.Value;
+                    else pc_fetch=now.pc+4;
+                    Reset();
+                    flag=1;
+                }
             }else if(now.Type==5){
                 if(now.Dest!=0) reg_out[now.Dest]=now.pc+4;
-                pc=now.Value;
-                Reset();
-                flag=1;
+                if(ask(now.opcode,0,6)==0b1100111){
+                    pc_fetch=now.Value;
+                    Reset();
+                    flag=1;
+                }
             }
         }
         if(!flag){
             if(now.Type!=3&&RegStat_in[now.Dest].Reorder==ROB_in.head){
-                com_to_RS_fl=1;
-                com_to_RS=now.Dest;
+                if(now.Type==5&&now.Dest==0);
+                else{
+                    com_to_RS_fl=1;
+                    com_to_RS=now.Dest;
+                }
             }
             ROB_pop_fl=1;
         }
@@ -387,7 +426,7 @@ void run(){
         run_slbuffer();
         run_reservation();
         run_rob();
-        run_get_inst();
+        run_inst_fetch_queue();
         run_regfile();
 
         update();

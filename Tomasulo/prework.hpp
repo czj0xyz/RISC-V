@@ -4,7 +4,7 @@
 const int reg_size=32;
 const int RS_size=32;
 
-int pc;
+int pc_fetch;
 
 struct RegStation{
     bool Busy;
@@ -63,9 +63,11 @@ public:
     }
 };
 
-Queue<ROB_Node>ROB_in,ROB_out;
+Queue<ROB_Node> ROB_in,ROB_out;
 
-Queue<Node>LSB_in,LSB_out;
+Queue<Node> LSB_in,LSB_out;
+
+Queue<Command> inst_in,inst_out;
 
 void print_rob(){
     cerr<<"ROB_opcode: ";
@@ -143,3 +145,25 @@ public:
 
 unsigned reg_in[reg_size],reg_out[reg_size];
 
+class Counter{
+public:
+    bool cnt[500005][2];
+    Counter(){
+        for(int i=0;i<500005;i++)cnt[i][1]=1;
+    }
+    bool Ask(int pos){
+        return cnt[pos][1];
+    }
+    void del(int pos){
+        if(!cnt[pos][0]){
+            cnt[pos][0]=cnt[pos][1];
+            cnt[pos][1]=0;
+        }else cnt[pos][0]=0;
+    }
+    void add(int pos){
+        if(cnt[pos][0]){
+            cnt[pos][0]=cnt[pos][1];
+            cnt[pos][1]=1;
+        }else cnt[pos][0]=1;
+    } 
+}cnt;

@@ -19,11 +19,12 @@ inline int change(unsigned x){
 }
 
 struct Command{
-    int rs1,rs2,rd,Type;
+    int rs1,rs2,rd,Type,pc;
     unsigned imm,opcode;
+    bool flag;
     Command(){}
-    Command(const int &rs1_,const int &rs2_,const int &rd_,const int &Type_,const unsigned &imm_,const unsigned &opcode_):
-        rs1(rs1_),rs2(rs2_),rd(rd_),Type(Type_),imm(imm_),opcode(opcode_){}
+    Command(const int &rs1_,const int &rs2_,const int &rd_,const int &Type_,const unsigned &imm_,const unsigned &opcode_,const int &pc_):
+        rs1(rs1_),rs2(rs2_),rd(rd_),Type(Type_),imm(imm_),opcode(opcode_),pc(pc_),flag(0){}
 };
 //0:rs1+rs2 1:rs1+imm 2:load 3:store 4:branch+rs1+rs2 5:branch+rd
 
@@ -72,7 +73,7 @@ Command get_command(const unsigned &cmd,const int &pc){
         break;
         default: opcode=0;
     }
-    return Command(rs1,rs2,rd,Type,imm,opcode);
+    return Command(rs1,rs2,rd,Type,imm,opcode,pc);
 }
 
 unsigned calc(const unsigned &rs1,const unsigned &rs2,const unsigned &imm,const unsigned &cmd){
