@@ -377,7 +377,7 @@ void run_issue(){
     }
 }
 
-int CNT=0;
+int CNT=0,failed=0;
 
 void run_commit(){
     ROB_pop_fl=memory_store=commit_opcode=com_to_RS_fl=0;
@@ -391,6 +391,7 @@ void run_commit(){
         else if(now.Type==3)memory_store=1,Store=now;//store
         else {//branch
             if(now.Type==4){
+                CNT++;
                 if(now.Dest&2)cnt.add(now.pc);
                 else cnt.del(now.pc);
                 if(now.Dest==1||now.Dest==2){
@@ -398,6 +399,7 @@ void run_commit(){
                     else pc_fetch=now.pc+4;
                     Reset();
                     flag=1;
+                    failed++;
                 }
             }else if(now.Type==5){
                 if(now.Dest!=0) reg_out[now.Dest]=now.pc+4;
@@ -436,6 +438,7 @@ void run(){
         run_commit();
         
         if(commit_opcode==0x0ff00513){
+            cerr<<1.0*(CNT-failed)/CNT<<endl;
             cout<<dec<<ask(reg_in[10],0,7)<<endl;
             return;
         }
