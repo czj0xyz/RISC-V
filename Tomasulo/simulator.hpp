@@ -1,4 +1,4 @@
-#include <iostream>
+#include <bits/stdc++.h>
 
 #include "prework.hpp"
 using namespace std;
