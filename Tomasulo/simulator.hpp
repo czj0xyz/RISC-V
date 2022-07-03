@@ -421,13 +421,13 @@ void run_commit(){
     }
 }
 
+void (*func[])() = { run_slbuffer, run_reservation, run_rob, run_inst_fetch_queue,run_regfile };
+
 void run(){
+    srand(19260817);
     for(int circle=0;;circle++){ 
-        run_slbuffer();
-        run_reservation();
-        run_rob();
-        run_inst_fetch_queue();
-        run_regfile();
+        random_shuffle(func,func+5);
+        for(int i=0;i<5;i++)func[i]();
 
         update();
         
