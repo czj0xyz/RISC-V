@@ -438,6 +438,7 @@ void run(){
         run_commit();
         
         if(commit_opcode==0x0ff00513){
+            cerr<<circle+1<<endl;
             cerr<<1.0*(CNT-failed)/CNT<<endl;
             cout<<dec<<ask(reg_in[10],0,7)<<endl;
             return;
